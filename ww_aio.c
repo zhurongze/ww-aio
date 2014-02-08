@@ -12,6 +12,7 @@ static void *dispatch_td_func(void *arg)
     img_op_t *op;
     img_aio_comp_t *comp;
     zmq_msg_t msg;
+    void *data = NULL;
     int rc = 0;
     while(1)
     {
@@ -21,11 +22,15 @@ static void *dispatch_td_func(void *arg)
         rc = zmq_msg_recv(&msg, ctx->pull_sock, 0);
         assert(rc != -1);
 
-        op = (img_op_t *)zmq_msg_data(&msg);
+        data = zmq_msg_data(&msg);
+        op = (img_op_t *)data;
         comp = op->comp;
 
         pthread_mutex_lock(&(comp->lock));
         comp->op.ret = op->ret;
+        if ((op->cmd && IMG_OP_TYPE_GET_DATA) & (op->len > 0)) {
+            memcpy((void *)(op->buf), data + sizeof(img_op_t), op->len);
+        }
         comp->aio_stat = IMG_AIO_STAT_ACK;
         pthread_mutex_unlock(&(comp->lock));
 
@@ -37,6 +42,9 @@ static void *dispatch_td_func(void *arg)
             pthread_mutex_unlock(&(comp->lock));
             pthread_cond_signal(&(comp->cond));
         }
+
+        rc = zmq_msg_close(&msg);
+        assert(rc == 0);
     }
 }
 
@@ -184,13 +192,15 @@ static int img_aio_submit(img_aio_ctx_t *ctx, img_op_t *op)
 
     void *dest = zmq_msg_data(&msg);
     memcpy(dest, (void *)op, sizeof(img_op_t));
-    if (op->len > 0) {
+    if ((op->cmd & IMG_OP_TYPE_PUT_DATA) && (op->len > 0)) {
         memcpy(dest + sizeof(img_op_t), (void *)(op->buf), op->len);
     }
 
     rc = zmq_msg_send(&msg, ctx->push_sock, 0);
     assert(rc == len);
     
+    rc = zmq_msg_close(&msg);
+    assert(rc == 0);
     return 0;
 
 }
@@ -263,7 +273,7 @@ int img_aio_create(img_aio_comp_t *comp, char *name, uint64_t size, int block_or
     img.order = block_order;
 
     tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_TYPE_CREATE, comp);
+    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_CREATE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
@@ -277,7 +287,7 @@ int img_aio_open(img_aio_comp_t *comp, char *name)
     img.name[strlen(name)] = 0;
 
     tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_TYPE_OPEN, comp);
+    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_OPEN, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
@@ -287,7 +297,7 @@ int img_aio_close(img_aio_comp_t *comp, int id)
     assert(comp != NULL);
 
     tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), id, NULL, 0, 0, seq, IMG_OP_TYPE_CLOSE, comp);
+    build_op(&(comp->op), id, NULL, 0, 0, seq, IMG_OP_CLOSE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
@@ -301,7 +311,7 @@ int img_aio_delete(img_aio_comp_t *comp, char *name)
     img.name[strlen(name)] = 0;
 
     tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_TYPE_DELETE, comp);
+    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_DELETE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
@@ -312,7 +322,7 @@ int img_aio_stat(img_aio_comp_t *comp, int id, img_info_t *img, int len)
     assert(img != NULL);
 
     tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), id, (char *)&img, 0, 0, seq, IMG_OP_TYPE_STAT, comp);
+    build_op(&(comp->op), id, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_STAT, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 
@@ -322,7 +332,7 @@ int img_aio_write(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t 
 {
     assert(comp != NULL);
     tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), id, buf, len, off, seq, IMG_OP_TYPE_WRITE, comp);
+    build_op(&(comp->op), id, buf, len, off, seq, IMG_OP_WRITE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
 
     return 0;
@@ -332,7 +342,7 @@ int img_aio_read(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t o
 {
     assert(comp != NULL);
     tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), id, buf, len, off, seq, IMG_OP_TYPE_READ, comp);
+    build_op(&(comp->op), id, buf, len, off, seq, IMG_OP_READ, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
