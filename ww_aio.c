@@ -151,7 +151,7 @@ img_aio_comp_t * img_aio_create_completion(img_aio_ctx_t *ctx, img_callback_t cb
     comp->cb = cb;
     comp->cb_arg = arg;
     comp->ctx = ctx;
-    comp->aio_stat = IMG_AIO_STAT_READY;
+    comp->aio_stat = IMG_AIO_STAT_NONE;
 
     pthread_mutex_init(&(comp->lock), NULL);
     pthread_cond_init(&(comp->cond), NULL);
@@ -199,7 +199,7 @@ static void img_aio_wait_for(img_aio_comp_t *comp, img_aio_stat_t stat)
 {
     assert(comp != NULL);
     pthread_mutex_lock(&(comp->lock));
-    while(comp->aio_stat < stat)
+    while((comp->aio_stat & stat) != stat)
     {
        pthread_cond_wait(&(comp->cond), &(comp->lock));
     }
@@ -216,15 +216,25 @@ void img_aio_wait_for_cb(img_aio_comp_t *comp)
     img_aio_wait_for(comp, IMG_AIO_STAT_CALLBACKED);
 }
 
-
-int img_aio_is_completion(img_aio_comp_t *comp)
+void img_aio_wait_for_ack_and_cb(img_aio_comp_t *comp)
 {
-    return (comp->aio_stat == IMG_AIO_STAT_ACK); 
+    img_aio_wait_for(comp, IMG_AIO_STAT_ACK | IMG_AIO_STAT_CALLBACKED);
 }
 
-int img_aio_is_callbacked(img_aio_comp_t *comp)
+
+int img_aio_is_ack(img_aio_comp_t *comp)
 {
-    return (comp->aio_stat == IMG_AIO_STAT_CALLBACKED); 
+    return (comp->aio_stat & IMG_AIO_STAT_ACK); 
+}
+
+int img_aio_is_cb(img_aio_comp_t *comp)
+{
+    return (comp->aio_stat & IMG_AIO_STAT_CALLBACKED); 
+}
+
+int img_aio_is_ack_and_cb(img_aio_comp_t *comp)
+{
+    return (comp->aio_stat & (IMG_AIO_STAT_ACK | IMG_AIO_STAT_CALLBACKED)); 
 }
 
 int img_aio_get_return_value(img_aio_comp_t *comp)

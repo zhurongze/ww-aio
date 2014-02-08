@@ -23,14 +23,13 @@ typedef enum {
     IMG_OP_TYPE_NONE,
 }img_op_type_t;
 
-typedef enum {
-    IMG_AIO_STAT_READY = 0,
-    IMG_AIO_STAT_FLIGHT,
-    IMG_AIO_STAT_ACK,
-    IMG_AIO_STAT_CALLBACKED,
-    IMG_AIO_STAT_RELEASED,
-    IMG_AIO_STAT_NONE,
-}img_aio_stat_t;
+#define    IMG_AIO_STAT_NONE            0x00
+#define    IMG_AIO_STAT_FLIGHT          0x01
+#define    IMG_AIO_STAT_ACK             0x02
+#define    IMG_AIO_STAT_CALLBACKED      0x04
+#define    IMG_AIO_STAT_RELEASED        0x08
+
+typedef uint32_t img_aio_stat_t;
 
 struct img_op_t;
 struct img_aio_comp_t;
@@ -108,8 +107,8 @@ int img_aio_stat(img_aio_comp_t *comp, int id, img_info_t *img, int len);
 
 void img_aio_wait_for_ack(img_aio_comp_t *comp);
 void img_aio_wait_for_cb(img_aio_comp_t *comp);
-int img_aio_is_completion(img_aio_comp_t *comp);
-int img_aio_is_completion_and_cb(img_aio_comp_t *comp);
+int img_aio_is_ack(img_aio_comp_t *comp);
+int img_aio_is_ack_and_cb(img_aio_comp_t *comp);
 int img_aio_get_return_value(img_aio_comp_t *comp);
 int img_aio_release(img_aio_comp_t *comp);
 
