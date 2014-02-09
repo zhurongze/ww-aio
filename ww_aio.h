@@ -6,22 +6,23 @@
 
 #define MAX_AIO_NUM         1024
 #define MAX_IMG_NAME_SIZE   257
-#define SUPER_IMG_ID         0 
+#define SUPER_IMG_ID         0
 
 typedef uint64_t tid_t;
 
 #define    IMG_OP_TYPE_NONE        0x0000
 #define    IMG_OP_TYPE_PUT_DATA    0x0100
 #define    IMG_OP_TYPE_GET_DATA    0x0200
+#define    IMG_OP_TYPE_SUPER       0x0400
 #define    IMG_OP_READ             (0x01 | IMG_OP_TYPE_GET_DATA)
 #define    IMG_OP_WRITE            (0x02 | IMG_OP_TYPE_PUT_DATA)
 #define    IMG_OP_DISCARD          (0x03 | IMG_OP_TYPE_NONE)
 #define    IMG_OP_FLUSH            (0x04 | IMG_OP_TYPE_NONE)
-#define    IMG_OP_CREATE           (0x05 | IMG_OP_TYPE_PUT_DATA)
-#define    IMG_OP_OPEN             (0x06 | IMG_OP_TYPE_PUT_DATA) 
-#define    IMG_OP_CLOSE            (0x07 | IMG_OP_TYPE_NONE) 
-#define    IMG_OP_STAT             (0x08 | IMG_OP_TYPE_GET_DATA) 
-#define    IMG_OP_DELETE           (0x09 | IMG_OP_TYPE_PUT_DATA) 
+#define    IMG_OP_CREATE           (0x05 | IMG_OP_TYPE_PUT_DATA | IMG_OP_TYPE_SUPER)
+#define    IMG_OP_OPEN             (0x06 | IMG_OP_TYPE_PUT_DATA | IMG_OP_TYPE_GET_DATA | IMG_OP_TYPE_SUPER)
+#define    IMG_OP_CLOSE            (0x07 | IMG_OP_TYPE_NONE)
+#define    IMG_OP_STAT             (0x08 | IMG_OP_TYPE_PUT_DATA | IMG_OP_TYPE_GET_DATA)
+#define    IMG_OP_DELETE           (0x09 | IMG_OP_TYPE_PUT_DATA | IMG_OP_TYPE_SUPER)
 
 typedef  uint32_t img_op_type_t;
 
@@ -98,15 +99,15 @@ int img_aio_destroy(img_aio_ctx_t *ctx);
 
 img_aio_comp_t * img_aio_create_completion(img_aio_ctx_t *ctx, img_callback_t cb, void *arg);
 
-int img_aio_create(img_aio_comp_t *comp, char *name, size_t size, int block_order);
-int img_aio_open(img_aio_comp_t *comp, char *name);
+int img_aio_create(img_aio_comp_t *comp, img_info_t *img);
+int img_aio_open(img_aio_comp_t *comp, img_info_t *img);
 int img_aio_close(img_aio_comp_t *comp, int id);
 int img_aio_delete(img_aio_comp_t *comp, char *name);
 
 
 int img_aio_write(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t off);
 int img_aio_read(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t off);
-int img_aio_stat(img_aio_comp_t *comp, int id, img_info_t *img, int len);
+int img_aio_stat(img_aio_comp_t *comp, img_info_t *img);
 
 void img_aio_wait_for_ack(img_aio_comp_t *comp);
 void img_aio_wait_for_cb(img_aio_comp_t *comp);
@@ -123,6 +124,6 @@ int img_delete(img_aio_ctx_t *ctx, char *name);
 
 int img_write(img_aio_ctx_t *ctx, int id, char *buf, size_t len, uint64_t off);
 int img_read(img_aio_ctx_t *ctx, int id, char *buf, size_t len, uint64_t off);
-int img_stat(img_aio_ctx_t *ctx, int id, img_info_t *img, int len);
+int img_stat(img_aio_ctx_t *ctx, int id, img_info_t *img);
 
 #endif

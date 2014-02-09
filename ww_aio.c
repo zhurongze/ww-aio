@@ -109,11 +109,9 @@ img_aio_ctx_t *img_aio_setup()
     assert(ctx != NULL);
     memset(ctx, 0, sizeof(img_aio_ctx_t));
 
-    printf("img_aio_setup: 1\n");
     ctx->mq_ctx = zmq_ctx_new();
     assert(ctx != NULL);
 
-    printf("img_aio_setup: 2\n");
     ctx->aios_base = malloc(sizeof(img_aio_comp_t) * MAX_AIO_NUM);
     assert(ctx->aios_base != NULL);
     memset(ctx->aios_base, 0, sizeof(img_aio_comp_t) * MAX_AIO_NUM);
@@ -124,24 +122,19 @@ img_aio_ctx_t *img_aio_setup()
     ctx->op_seq = 0;
     ctx->aios_p = 0;
 
-    printf("img_aio_setup: 3\n");
     pthread_mutex_init(&(ctx->lock), NULL);
     pthread_cond_init(&(ctx->cond), NULL);
 
-    printf("img_aio_setup: 4\n");
     ctx->pull_sock = zmq_socket(ctx->mq_ctx, ZMQ_PULL);
     rc = zmq_bind(ctx->pull_sock, "tcp://*:9000");
     assert(rc == 0);
 
-    printf("img_aio_setup: 5\n");
     ctx->push_sock = zmq_socket(ctx->mq_ctx, ZMQ_PUSH);
     rc = zmq_connect(ctx->push_sock, "tcp://localhost:9001");
     assert(rc == 0);
 
-    printf("img_aio_setup: 6\n");
     rc = pthread_create(&(ctx->dispatch_td), NULL, dispatch_td_func, (void *)ctx);
     assert(rc == 0);
-    printf("img_aio_setup: 7\n");
 
     return ctx;
 }
@@ -198,7 +191,7 @@ static int img_aio_submit(img_aio_ctx_t *ctx, img_op_t *op)
 
     rc = zmq_msg_send(&msg, ctx->push_sock, 0);
     assert(rc == len);
-    
+
     rc = zmq_msg_close(&msg);
     assert(rc == 0);
     return 0;
@@ -234,17 +227,17 @@ void img_aio_wait_for_ack_and_cb(img_aio_comp_t *comp)
 
 int img_aio_is_ack(img_aio_comp_t *comp)
 {
-    return (comp->aio_stat & IMG_AIO_STAT_ACK); 
+    return (comp->aio_stat & IMG_AIO_STAT_ACK);
 }
 
 int img_aio_is_cb(img_aio_comp_t *comp)
 {
-    return (comp->aio_stat & IMG_AIO_STAT_CALLBACKED); 
+    return (comp->aio_stat & IMG_AIO_STAT_CALLBACKED);
 }
 
 int img_aio_is_ack_and_cb(img_aio_comp_t *comp)
 {
-    return (comp->aio_stat & (IMG_AIO_STAT_ACK | IMG_AIO_STAT_CALLBACKED)); 
+    return (comp->aio_stat & (IMG_AIO_STAT_ACK | IMG_AIO_STAT_CALLBACKED));
 }
 
 int img_aio_get_return_value(img_aio_comp_t *comp)
@@ -262,32 +255,25 @@ int img_aio_release(img_aio_comp_t *comp)
 //async operates
 
 // create,open,delete operates's img id is SUPER_IMG_ID
-int img_aio_create(img_aio_comp_t *comp, char *name, uint64_t size, int block_order)
+int img_aio_create(img_aio_comp_t *comp, img_info_t *img)
 {
-    img_info_t img;
     assert(comp != NULL);
+    assert(img != NULL);
 
-    memcpy(img.name, name, strlen(name));
-    img.name[strlen(name)] = 0;
-    img.size = size;
-    img.order = block_order;
 
-    tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_CREATE, comp);
+    tid_t seq = get_new_seq(comp->ctx);
+    build_op(&(comp->op), SUPER_IMG_ID, (char *)img, sizeof(img_info_t), 0, seq, IMG_OP_CREATE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
 
-int img_aio_open(img_aio_comp_t *comp, char *name)
+int img_aio_open(img_aio_comp_t *comp, img_info_t *img)
 {
-    img_info_t img;
     assert(comp != NULL);
+    assert(img != NULL);
 
-    memcpy(img.name, name, strlen(name));
-    img.name[strlen(name)] = 0;
-
-    tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_OPEN, comp);
+    tid_t seq = get_new_seq(comp->ctx);
+    build_op(&(comp->op), SUPER_IMG_ID, (char *)img, sizeof(img_info_t), 0, seq, IMG_OP_OPEN, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
@@ -296,7 +282,7 @@ int img_aio_close(img_aio_comp_t *comp, int id)
 {
     assert(comp != NULL);
 
-    tid_t seq = get_new_seq(comp->ctx); 
+    tid_t seq = get_new_seq(comp->ctx);
     build_op(&(comp->op), id, NULL, 0, 0, seq, IMG_OP_CLOSE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
@@ -310,19 +296,19 @@ int img_aio_delete(img_aio_comp_t *comp, char *name)
     memcpy(img.name, name, strlen(name));
     img.name[strlen(name)] = 0;
 
-    tid_t seq = get_new_seq(comp->ctx); 
+    tid_t seq = get_new_seq(comp->ctx);
     build_op(&(comp->op), SUPER_IMG_ID, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_DELETE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 }
 
-int img_aio_stat(img_aio_comp_t *comp, int id, img_info_t *img, int len)
+int img_aio_stat(img_aio_comp_t *comp, img_info_t *img)
 {
     assert(comp != NULL);
     assert(img != NULL);
 
-    tid_t seq = get_new_seq(comp->ctx); 
-    build_op(&(comp->op), id, (char *)&img, sizeof(img_info_t), 0, seq, IMG_OP_STAT, comp);
+    tid_t seq = get_new_seq(comp->ctx);
+    build_op(&(comp->op), img->id, (char *)img, sizeof(img_info_t), 0, seq, IMG_OP_STAT, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
 
@@ -331,7 +317,7 @@ int img_aio_stat(img_aio_comp_t *comp, int id, img_info_t *img, int len)
 int img_aio_write(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t off)
 {
     assert(comp != NULL);
-    tid_t seq = get_new_seq(comp->ctx); 
+    tid_t seq = get_new_seq(comp->ctx);
     build_op(&(comp->op), id, buf, len, off, seq, IMG_OP_WRITE, comp);
     img_aio_submit(comp->ctx, &(comp->op));
 
@@ -341,7 +327,7 @@ int img_aio_write(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t 
 int img_aio_read(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t off)
 {
     assert(comp != NULL);
-    tid_t seq = get_new_seq(comp->ctx); 
+    tid_t seq = get_new_seq(comp->ctx);
     build_op(&(comp->op), id, buf, len, off, seq, IMG_OP_READ, comp);
     img_aio_submit(comp->ctx, &(comp->op));
     return 0;
@@ -353,24 +339,43 @@ int img_create(img_aio_ctx_t *ctx, char *name, size_t size, int block_order)
 {
     int ret = 0;
     img_aio_comp_t *comp;
+    img_info_t img;
+
+    memcpy(img.name, name, strlen(name));
+    img.name[strlen(name)] = 0;
+    img.size = size;
+    img.order = block_order;
+
     comp = img_aio_create_completion(ctx, NULL, NULL);
-    img_aio_create(comp, name, size, block_order);
+    img_aio_create(comp, &img);
     img_aio_wait_for_ack(comp);
     ret = img_aio_get_return_value(comp);
     img_aio_release(comp);
     return ret;
 }
 
+// return img description
 int img_open(img_aio_ctx_t *ctx, char *name)
 {
     int ret = 0;
     img_aio_comp_t *comp;
+    img_info_t img;
+
+    memcpy(img.name, name, strlen(name));
+    img.name[strlen(name)] = 0;
+    img.id = 0;
+
     comp = img_aio_create_completion(ctx, NULL, NULL);
-    img_aio_open(comp, name);
+    img_aio_open(comp, &img);
     img_aio_wait_for_ack(comp);
     ret = img_aio_get_return_value(comp);
     img_aio_release(comp);
-    return ret;
+
+    if (ret == 0) {
+        return img.id;
+    } else {
+        return -1;
+    }
 }
 
 int img_close(img_aio_ctx_t *ctx, int id)
@@ -421,12 +426,13 @@ int img_read(img_aio_ctx_t *ctx, int id, char *buf, size_t len, uint64_t off)
     return ret;
 }
 
-int img_stat(img_aio_ctx_t *ctx, int id, img_info_t *img, int len)
+int img_stat(img_aio_ctx_t *ctx, int id, img_info_t *img)
 {
     int ret = 0;
     img_aio_comp_t *comp;
     comp = img_aio_create_completion(ctx, NULL, NULL);
-    img_aio_stat(comp, id, img, len);
+    img->id = id;
+    img_aio_stat(comp, img);
     img_aio_wait_for_ack(comp);
     ret = img_aio_get_return_value(comp);
     img_aio_release(comp);
