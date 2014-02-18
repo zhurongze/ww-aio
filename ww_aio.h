@@ -30,7 +30,6 @@ typedef  uint32_t img_op_type_t;
 #define    IMG_AIO_STAT_NONE            0x00
 #define    IMG_AIO_STAT_FLIGHT          0x01
 #define    IMG_AIO_STAT_ACK             0x02
-#define    IMG_AIO_STAT_CALLBACKED      0x04
 #define    IMG_AIO_STAT_RELEASED        0x08
 
 typedef uint32_t img_aio_stat_t;
@@ -52,6 +51,8 @@ struct img_op_t {
     char *buf;
     tid_t seq;
     size_t len;
+    size_t send_len;
+    size_t reply_len;
     uint64_t off;
     img_op_type_t cmd;
     int ret;
@@ -74,9 +75,9 @@ struct img_aio_ctx_t {
     void *mq_ctx;
     void *pull_sock;
     void *push_sock;
-    img_aio_comp_t *aios_base;
-    int aios_p;
-    char *aio_comp_map;
+    img_aio_comp_t *comp_array_base;
+    int comp_array_p;
+    char *comp_map;
     pthread_t dispatch_td;
     pthread_t callback_td;
     tid_t op_seq;
@@ -110,9 +111,7 @@ int img_aio_read(img_aio_comp_t *comp, int id, char *buf, size_t len, uint64_t o
 int img_aio_stat(img_aio_comp_t *comp, img_info_t *img);
 
 void img_aio_wait_for_ack(img_aio_comp_t *comp);
-void img_aio_wait_for_cb(img_aio_comp_t *comp);
 int img_aio_is_ack(img_aio_comp_t *comp);
-int img_aio_is_ack_and_cb(img_aio_comp_t *comp);
 int img_aio_get_return_value(img_aio_comp_t *comp);
 int img_aio_release(img_aio_comp_t *comp);
 
